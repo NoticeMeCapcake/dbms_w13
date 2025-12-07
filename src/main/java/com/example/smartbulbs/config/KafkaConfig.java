@@ -15,6 +15,7 @@ import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.*;
+import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
@@ -37,7 +38,6 @@ public class KafkaConfig {
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
-        // Требования задания: гарантии доставки
         props.put(ProducerConfig.ACKS_CONFIG, "all"); // Ждать подтверждения от всех реплик
         props.put(ProducerConfig.RETRIES_CONFIG, 5); // 5 попыток повторной отправки
         props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true); // Идемпотентность
@@ -59,10 +59,8 @@ public class KafkaConfig {
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-        // Требования задания: ручной коммит
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-        // Требования задания: чтение только закоммиченных
-        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, valueClass); // Позволяет десериализовать в Object, потом кастовать
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, valueClass);
         props.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
         factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(props));
         return factory;
@@ -71,7 +69,9 @@ public class KafkaConfig {
     // Фабрика для телеметрии
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, LampTelemetry> telemetryConsumerFactory() {
-        return consumerFactory("analytics-processor", LampTelemetry.class);
+        var baseFactory = consumerFactory("telemetry-processor", LampTelemetry.class);
+        baseFactory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+        return baseFactory;
     }
 
     // Фабрика для команд
@@ -92,6 +92,8 @@ public class KafkaConfig {
             System.out.println("Sent failed command to DLQ: " + dlqMessage);
         }, new FixedBackOff(1000, 3)));
 
+        baseFactory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+
         return baseFactory;
     }
 
@@ -102,7 +104,6 @@ public class KafkaConfig {
         return TopicBuilder.name("lamp-telemetry")
                 .partitions(3)
                 .replicas(3)
-                .compact() // Cleanup policy: compact (если нужен) или delete
                 .config("retention.ms", String.valueOf(24 * 60 * 60 * 1000L)) // 24 часа
                 .build();
     }
@@ -112,7 +113,6 @@ public class KafkaConfig {
         return TopicBuilder.name("lamp-commands")
                 .partitions(2)
                 .replicas(3)
-                .compact()
                 .config("retention.ms", String.valueOf(7 * 24 * 60 * 60 * 1000L)) // 7 дней
                 .build();
     }
@@ -122,7 +122,6 @@ public class KafkaConfig {
         return TopicBuilder.name("lamp-analytics")
                 .partitions(1)
                 .replicas(3)
-                .compact()
                 .config("retention.ms", String.valueOf(30 * 24 * 60 * 60 * 1000L)) // 30 дней
                 .build();
     }
@@ -132,7 +131,6 @@ public class KafkaConfig {
         return TopicBuilder.name("lamp-commands-dlq")
                 .partitions(1)
                 .replicas(3)
-                .compact()
                 .config("retention.ms", String.valueOf(7 * 24 * 60 * 60 * 1000L)) // 7 дней
                 .build();
     }
