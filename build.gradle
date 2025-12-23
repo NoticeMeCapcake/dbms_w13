@@ -1,0 +1,34 @@
+plugins {
+    id 'org.springframework.boot' version '3.3.6' // Используйте последнюю стабильную версию Spring Boot 3.x
+    id 'io.spring.dependency-management' version '1.1.6'
+    id 'java'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Spring Boot Starter Web для REST API
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    // Spring Kafka для взаимодействия с Kafka
+    implementation 'org.springframework.kafka:spring-kafka'
+    implementation 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    // Jackson для (де)сериализации JSON (обычно входит автоматически, но можно указать явно)
+    // implementation 'com.fasterxml.jackson.core:jackson-databind'
+
+    // DevTools для удобства разработки
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // Зависимости для тестирования
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.kafka:spring-kafka-test' // Для тестирования с Kafka
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
